@@ -570,7 +570,9 @@
                 const response = await fetch(fetchUrl, {
                     mode: 'cors',
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Origin': window.location.origin,
+                        'User-Agent': 'Site.View/1.0'
                     }
                 });
                 
@@ -590,9 +592,47 @@
                 showStatus('Content loaded via fetch', 'success');
                 
             } catch (error) {
-                showStatus('All methods failed: ' + error.message, 'error');
-                document.getElementById('fallbackViewer').style.display = 'block';
-                document.getElementById('sourceCode').textContent = 'Failed to load content: ' + error.message + '\n\nTry:\n1. Different proxy URL\n2. Check if site allows CORS\n3. Site may require authentication';
+                showStatus('Trying alternative proxy...', 'info');
+                
+                // Try alternative proxies
+                const alternativeProxies = [
+                    'https://thingproxy.freeboard.io/fetch/',
+                    'https://api.allorigins.win/get?url='
+                ];
+                
+                let success = false;
+                
+                for (const proxy of alternativeProxies) {
+                    try {
+                        const altResponse = await fetch(proxy + encodeURIComponent(url));
+                        
+                        if (altResponse.ok) {
+                            let content;
+                            if (proxy.includes('allorigins')) {
+                                const data = await altResponse.json();
+                                content = data.contents;
+                            } else {
+                                content = await altResponse.text();
+                            }
+                            
+                            document.getElementById('fallbackViewer').style.display = 'block';
+                            document.getElementById('sourceCode').textContent = content;
+                            siteFrame.style.display = 'none';
+                            showStatus('Content loaded via alternative proxy', 'success');
+                            success = true;
+                            break;
+                        }
+                    } catch (e) {
+                        // Try next proxy
+                        continue;
+                    }
+                }
+                
+                if (!success) {
+                    showStatus('All methods failed: ' + error.message, 'error');
+                    document.getElementById('fallbackViewer').style.display = 'block';
+                    document.getElementById('sourceCode').textContent = 'Failed to load content: ' + error.message + '\n\n🔧 SOLUTIONS:\n\n1. Try "CORS Anywhere" button (may need activation)\n2. Try "Use Proxy" with custom URL\n3. Some sites block all external access\n4. Site may require authentication\n\n💡 TIP: Click "CORS Anywhere" button, then visit:\nhttps://cors-anywhere.herokuapp.com/corsdemo\nClick "Request temporary access" then try again!';
+                }
             }
         }
         
